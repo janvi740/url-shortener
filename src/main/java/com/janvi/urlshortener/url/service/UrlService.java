@@ -1,5 +1,5 @@
 package com.janvi.urlshortener.url.service;
-
+import org.springframework.beans.factory.annotation.Value;
 import com.janvi.urlshortener.url.dto.CreateUrlRequest;
 import com.janvi.urlshortener.url.dto.CreateUrlResponse;
 import com.janvi.urlshortener.url.entity.Url;
@@ -14,7 +14,8 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class UrlService {
 
-    private static final String BASE_URL = "http://localhost:8080/";
+    @Value("${app.base-url}")
+    private String baseUrl;
 
     private final UrlRepository urlRepository;
     private final UserRepository userRepository;
@@ -44,7 +45,7 @@ public class UrlService {
                 .id(savedUrl.getId())
                 .originalUrl(savedUrl.getOriginalUrl())
                 .shortCode(savedUrl.getShortCode())
-                .shortUrl(BASE_URL + savedUrl.getShortCode())
+                .shortUrl(baseUrl + "/" + savedUrl.getShortCode())
                 .expiresAt(savedUrl.getExpiresAt())
                 .createdAt(savedUrl.getCreatedAt())
                 .build();

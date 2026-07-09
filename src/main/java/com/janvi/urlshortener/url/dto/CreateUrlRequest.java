@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 public class CreateUrlRequest {
 
     @NotBlank(message = "Original URL is required")
+    @org.hibernate.validator.constraints.URL(message = "Original URL must be valid")
     private String originalUrl;
 
     private LocalDateTime expiresAt;
