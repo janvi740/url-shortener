@@ -66,4 +66,20 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest()
                 .body(errorResponse);
     }
+
+    @ExceptionHandler(InvalidAliasException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidAlias(
+            InvalidAliasException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse response = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.badRequest().body(response);
+    }
 }

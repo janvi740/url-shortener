@@ -9,6 +9,10 @@ import com.janvi.urlshortener.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import com.janvi.urlshortener.common.exception.DuplicateResourceException;
+import com.janvi.urlshortener.common.exception.InvalidAliasException;
+import java.util.Locale;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -21,6 +25,15 @@ public class UrlService {
     private final UserRepository userRepository;
     private final ShortCodeGenerator shortCodeGenerator;
 
+    private static final Set<String> RESERVED_ALIASES = Set.of(
+            "api",
+            "health",
+            "login",
+            "register",
+            "admin",
+            "error"
+    );
+
     public CreateUrlResponse createShortUrl(CreateUrlRequest request) {
 
         String email = SecurityContextHolder.getContext()
@@ -30,7 +43,7 @@ public class UrlService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
 
-        String shortCode = generateUniqueShortCode();
+        String shortCode = resolveShortCode(request.getCustomAlias());
 
         Url url = Url.builder()
                 .originalUrl(request.getOriginalUrl())
@@ -59,6 +72,31 @@ public class UrlService {
         } while (urlRepository.existsByShortCode(shortCode));
 
         return shortCode;
+    }
+
+    private String resolveShortCode(String customAlias) {
+
+        if (customAlias == null || customAlias.isBlank()) {
+            return generateUniqueShortCode();
+        }
+
+        String normalizedAlias = customAlias
+                .trim()
+                .toLowerCase(Locale.ROOT);
+
+        if (RESERVED_ALIASES.contains(normalizedAlias)) {
+            throw new InvalidAliasException(
+                    "The alias '" + normalizedAlias + "' is reserved"
+            );
+        }
+
+        if (urlRepository.existsByShortCode(normalizedAlias)) {
+            throw new DuplicateResourceException(
+                    "Custom alias is already in use"
+            );
+        }
+
+        return normalizedAlias;
     }
 
     public String getOriginalUrl(String shortCode) {
