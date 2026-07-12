@@ -13,6 +13,11 @@ import com.janvi.urlshortener.common.exception.DuplicateResourceException;
 import com.janvi.urlshortener.common.exception.InvalidAliasException;
 import java.util.Locale;
 import java.util.Set;
+import com.janvi.urlshortener.url.cache.RedirectCacheEntry;
+import com.janvi.urlshortener.url.cache.UrlCacheService;
+
+import java.time.Duration;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +29,7 @@ public class UrlService {
     private final UrlRepository urlRepository;
     private final UserRepository userRepository;
     private final ShortCodeGenerator shortCodeGenerator;
+    private final UrlCacheService urlCacheService;
 
     private static final Set<String> RESERVED_ALIASES = Set.of(
             "api",
@@ -101,17 +107,57 @@ public class UrlService {
 
     public String getOriginalUrl(String shortCode) {
 
+        RedirectCacheEntry cachedEntry = urlCacheService.get(shortCode)
+                .orElse(null);
+
+        if (cachedEntry != null) {
+
+            if (cachedEntry.getExpiresAt() != null
+                    && cachedEntry.getExpiresAt().isBefore(LocalDateTime.now())) {
+                throw new RuntimeException("Short URL has expired");
+            }
+
+            return cachedEntry.getOriginalUrl();
+        }
+
         Url url = urlRepository.findByShortCode(shortCode)
                 .orElseThrow(() -> new RuntimeException("Short URL not found"));
 
-        if (url.getExpiresAt() != null &&
-                url.getExpiresAt().isBefore(java.time.LocalDateTime.now())) {
+        if (url.getExpiresAt() != null
+                && url.getExpiresAt().isBefore(LocalDateTime.now())) {
             throw new RuntimeException("Short URL has expired");
         }
+
+        RedirectCacheEntry entry = new RedirectCacheEntry(
+                url.getOriginalUrl(),
+                url.getExpiresAt()
+        );
+
+        Duration ttl = calculateCacheTtl(url.getExpiresAt());
+
+        urlCacheService.put(shortCode, entry, ttl);
 
         url.setClickCount(url.getClickCount() + 1);
         urlRepository.save(url);
 
         return url.getOriginalUrl();
+    }
+
+    private Duration calculateCacheTtl(LocalDateTime expiresAt) {
+
+        Duration defaultTtl = Duration.ofHours(24);
+
+        if (expiresAt == null) {
+            return defaultTtl;
+        }
+
+        Duration remaining = Duration.between(
+                LocalDateTime.now(),
+                expiresAt
+        );
+
+        return remaining.compareTo(defaultTtl) < 0
+                ? remaining
+                : defaultTtl;
     }
 }
