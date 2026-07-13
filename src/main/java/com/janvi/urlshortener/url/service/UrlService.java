@@ -18,6 +18,7 @@ import com.janvi.urlshortener.url.cache.UrlCacheService;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import com.janvi.urlshortener.url.analytics.UrlClickCounterService;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +31,7 @@ public class UrlService {
     private final UserRepository userRepository;
     private final ShortCodeGenerator shortCodeGenerator;
     private final UrlCacheService urlCacheService;
+    private final UrlClickCounterService urlClickCounterService;
 
     private static final Set<String> RESERVED_ALIASES = Set.of(
             "api",
@@ -112,21 +114,19 @@ public class UrlService {
 
         if (cachedEntry != null) {
 
-            if (cachedEntry.getExpiresAt() != null
-                    && cachedEntry.getExpiresAt().isBefore(LocalDateTime.now())) {
-                throw new RuntimeException("Short URL has expired");
-            }
+            validateExpiry(cachedEntry.getExpiresAt());
+
+            urlClickCounterService.increment(shortCode);
 
             return cachedEntry.getOriginalUrl();
         }
 
         Url url = urlRepository.findByShortCode(shortCode)
-                .orElseThrow(() -> new RuntimeException("Short URL not found"));
+                .orElseThrow(() ->
+                        new RuntimeException("Short URL not found")
+                );
 
-        if (url.getExpiresAt() != null
-                && url.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("Short URL has expired");
-        }
+        validateExpiry(url.getExpiresAt());
 
         RedirectCacheEntry entry = new RedirectCacheEntry(
                 url.getOriginalUrl(),
@@ -137,10 +137,18 @@ public class UrlService {
 
         urlCacheService.put(shortCode, entry, ttl);
 
-        url.setClickCount(url.getClickCount() + 1);
-        urlRepository.save(url);
+        urlClickCounterService.increment(shortCode);
 
         return url.getOriginalUrl();
+    }
+
+    private void validateExpiry(LocalDateTime expiresAt) {
+
+        if (expiresAt != null &&
+                expiresAt.isBefore(LocalDateTime.now())) {
+
+            throw new RuntimeException("Short URL has expired");
+        }
     }
 
     private Duration calculateCacheTtl(LocalDateTime expiresAt) {
