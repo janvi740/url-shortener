@@ -24,4 +24,9 @@ public interface UrlRepository extends JpaRepository<Url, Long> {
             @Param("shortCode") String shortCode,
             @Param("delta") long delta
     );
+
+    Optional<Url> findByShortCodeAndUserEmail(
+            String shortCode,
+            String email
+    );
 }

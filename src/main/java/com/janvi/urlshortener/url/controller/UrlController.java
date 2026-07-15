@@ -2,6 +2,7 @@ package com.janvi.urlshortener.url.controller;
 
 import com.janvi.urlshortener.url.dto.CreateUrlRequest;
 import com.janvi.urlshortener.url.dto.CreateUrlResponse;
+import com.janvi.urlshortener.url.dto.UrlAnalyticsResponse;
 import com.janvi.urlshortener.url.service.UrlService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,5 +22,12 @@ public class UrlController {
             @Valid @RequestBody CreateUrlRequest request
     ) {
         return urlService.createShortUrl(request);
+    }
+
+    @GetMapping("/{shortCode}/analytics")
+    public UrlAnalyticsResponse getAnalytics(
+            @PathVariable String shortCode
+    ) {
+        return urlService.getAnalytics(shortCode);
     }
 }

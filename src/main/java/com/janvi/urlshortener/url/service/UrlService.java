@@ -19,6 +19,7 @@ import com.janvi.urlshortener.url.cache.UrlCacheService;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import com.janvi.urlshortener.url.analytics.UrlClickCounterService;
+import com.janvi.urlshortener.url.dto.UrlAnalyticsResponse;
 
 @Service
 @RequiredArgsConstructor
@@ -167,5 +168,37 @@ public class UrlService {
         return remaining.compareTo(defaultTtl) < 0
                 ? remaining
                 : defaultTtl;
+    }
+
+    public UrlAnalyticsResponse getAnalytics(String shortCode) {
+
+        String email = SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getName();
+
+        Url url = urlRepository
+                .findByShortCodeAndUserEmail(shortCode, email)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "URL not found or you do not have permission"
+                        )
+                );
+
+        long persistedClicks = url.getClickCount() == null
+                ? 0L
+                : url.getClickCount();
+
+        long pendingClicks =
+                urlClickCounterService.getPendingClicks(shortCode);
+
+        return UrlAnalyticsResponse.builder()
+                .shortCode(url.getShortCode())
+                .originalUrl(url.getOriginalUrl())
+                .persistedClicks(persistedClicks)
+                .pendingClicks(pendingClicks)
+                .totalClicks(persistedClicks + pendingClicks)
+                .createdAt(url.getCreatedAt())
+                .expiresAt(url.getExpiresAt())
+                .build();
     }
 }
